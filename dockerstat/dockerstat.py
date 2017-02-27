@@ -1,7 +1,7 @@
 import argparse
 from docker.Container import Container
 from docker.ContainerCollection import ContainerCollection
-from stats.CpuAcct import CpuAcct
+from stats.CpuAcct import CpuAcctStat, CpuAcctPerCore, ThrottledCpu
 
 def main():
     parser = argparse.ArgumentParser()
@@ -17,8 +17,12 @@ def main():
     allContainers.getAllContainers()
     print('Found total {0} containers'.format(len(allContainers.containers())))
     for container in runningContainers.containers():
-        cpuacct = CpuAcct(container.id, container.name)
+        cpuacct = CpuAcctStat(container.id, container.name)
         print cpuacct
+        percpu =CpuAcctPerCore(container.id, container.name)
+        print percpu
+        throttled = ThrottledCpu(container.id, container.name)
+        print throttled
 
 
 
