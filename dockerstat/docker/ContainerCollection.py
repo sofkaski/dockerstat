@@ -15,18 +15,21 @@ class ContainerCollection:
         self.getContainers(runningOnly=False)
 
     def getContainers(self, runningOnly=False):
+        formatString = '{{.ID}};{{.Names}};{{.Image}};{{.Status}}'
         if (runningOnly):
-            lines = subprocess.check_output(['docker','ps', '--no-trunc']).splitlines()
+            lines = subprocess.check_output(['docker','ps', '--no-trunc', '--format', formatString ]).splitlines()
         else:
-            lines = subprocess.check_output(['docker','ps','-a', '--no-trunc']).splitlines()
+            lines = subprocess.check_output(['docker','ps','-a', '--no-trunc', '--format', formatString ]).splitlines()
 
-        if (len(lines) > 1):
-            for line in lines[1:]:
-                fields = line.split()
+        if (len(lines) > 0):
+            for line in lines:
+                fields = line.split(';')
+                if (len(fields) < 4):
+                    next
                 running = True;
-                if (fields[4].find("Exited")):
+                if (fields[2].find("Exited")):
                     running = False
-                container = Container(fields[0], fields[6], image=fields[1], running=running)
+                container = Container(fields[0], fields[1], image=fields[2], running=running)
                 self._containers.append(container)
 
     def containers(self):
