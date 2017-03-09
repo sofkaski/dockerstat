@@ -41,7 +41,7 @@ class CpuAcctPerCore:
        cpu = ''
        for i, core in enumerate(self.perCore):
            if (i):
-               cpu += ',' + core
+               cpu += ';' + core
            else:
                cpu += core
        return cpu
