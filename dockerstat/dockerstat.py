@@ -4,10 +4,14 @@ from time import time
 import itertools
 import os
 import re
+import pprint
 from sys import exit
 from docker.Container import Container
 from docker.ContainerCollection import ContainerCollection
 from stats.CpuAcct import CpuAcctStat, CpuAcctPerCore, ThrottledCpu
+from stats.MemStat import MemStat
+
+pp = pprint.PrettyPrinter(indent=4, width=40, depth=None, stream=None)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -18,7 +22,8 @@ def main():
     #print('Result:',  vars(parsed))
     outputFileNameBase =  parsed.output
     print 'Output files: ' + outputFileNameBase + "*.csv"
-    samples = []
+    cpuSamples = []
+    memorySamples = []
 
     runningContainers = ContainerCollection()
     runningContainers.getRunningContainers()
@@ -34,8 +39,10 @@ def main():
             tmp = raw_input('Next sample? (ctrl-d to exit) [' + sampleName + ']: ')
             if tmp != '':
                 sampleName = tmp
-            sample = collectCpuSample(sampleName, runningContainers)
-            samples.append(sample)
+            cpuSample = collectCpuSample(sampleName, runningContainers)
+            cpuSamples.append(cpuSample)
+            memorySample = collectMemorySample(sampleName, runningContainers)
+            memorySamples.append(memorySample)
             sampleNumber += 1
         except EOFError as e:
             break
@@ -46,8 +53,16 @@ def main():
     print('\nWriting cpu statistics to {0} ...'.format(outputFileName))
     with open(outputFileName, 'w') as outputFile:
         writeCpuStatisticsHeader(outputFile)
-        for sample in samples:
-            writeCpuSample(outputFile, sample)
+        for cpuSample in cpuSamples:
+            writeCpuSample(outputFile, cpuSample)
+    outputFile.close()
+
+    outputFileName = uniqueFileName(outputFileNameBase + '-mem.csv')
+    print('\nWriting memory statistics to {0} ...'.format(outputFileName))
+    with open(outputFileName, 'w') as outputFile:
+        writeMemoryStatisticsHeader(outputFile)
+        for memorySample in memorySamples:
+            writeMemorySample(outputFile, memorySample)
     outputFile.close()
 
     exit()
@@ -68,10 +83,14 @@ def collectCpuSample(sampleName, runningContainers):
     sample = {}
     sample['name'] = sampleName
     sample['timestamp'] = time()
+    sample['containers'] = {}
     for container in runningContainers.containers():
-        sample['cpuacct'] = CpuAcctStat(container.id, container.name)
-        sample['percpu'] = CpuAcctPerCore(container.id, container.name)
-        sample['throttled'] = ThrottledCpu(container.id, container.name)
+        sampleSet = {}
+        sampleSet['cpuacct'] = CpuAcctStat(container.id, container.name)
+        sampleSet['percpu'] = CpuAcctPerCore(container.id, container.name)
+        sampleSet['throttled'] = ThrottledCpu(container.id, container.name)
+        sample['containers'][container.name] = sampleSet
+    # pp.pprint(sample)
     return sample
 
 def writeCpuStatisticsHeader(outputFile):
@@ -80,16 +99,55 @@ def writeCpuStatisticsHeader(outputFile):
      outputFile.write("Cores\n")
 
 def writeCpuSample(outputFile, sample):
-    cpuacct = sample['cpuacct']
-    outputFile.write("{0};{1};{2};{3};{4};".format(sample['name'], sample['timestamp'],
-                     cpuacct.containerName,
-                     cpuacct.userJiffies,
-                     cpuacct.systemJiffies))
-    throttled = sample['throttled']
-    outputFile.write("{0};{1};{2};".format(throttled.enforcementIntervals,
-                                            throttled.groupThrottilingCount,
-                                            throttled.throttledTimeTotal))
-    outputFile.write("{0}\n".format(sample['percpu'].cpuPerCores()))
+    for (container, sampleSet) in sample['containers'].iteritems():
+        cpuacct = sampleSet['cpuacct']
+        outputFile.write("{0};{1};{2};{3};{4};".format(sample['name'], sample['timestamp'],
+                         container,
+                         cpuacct.userJiffies,
+                         cpuacct.systemJiffies))
+        throttled = sampleSet['throttled']
+        outputFile.write("{0};{1};{2};".format(throttled.enforcementIntervals,
+                                                throttled.groupThrottilingCount,
+                                                throttled.throttledTimeTotal))
+        outputFile.write("{0}\n".format(sampleSet['percpu'].cpuPerCores()))
+
+def collectMemorySample(sampleName, runningContainers):
+    sample = {}
+    sample['name'] = sampleName
+    sample['timestamp'] = time()
+    sample['containers'] = {}
+    for container in runningContainers.containers():
+        sample['containers'][container] = MemStat(container.id, container.name)
+    return sample
+
+def writeMemoryStatisticsHeader(outputFile):
+     outputFile.write("Sample;Timestamp;Container;cache;rss;rss_huge;")
+     outputFile.write("mapped_file;dirty;writeback;pgpgin;pgpgout;pgfault;pgmajfault;")
+     outputFile.write("inactive_anon;active_anon;inactive_file;active_file;unevictable\n")
+
+def writeMemorySample(outputFile, sample):
+    for (container, memStat) in sample['containers'].iteritems():
+        memory = memStat.values
+        outputFile.write("{0};{1};{2}".format(sample['name'], sample['timestamp'], container.name))
+        outputFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};".format(
+                                            memory['cache'],
+                                            memory['rss'],
+                                            memory['rss_huge'],
+                                            memory['mapped_file'],
+                                            memory['dirty'],
+                                            memory['writeback'],
+                                            memory['pgpgin'],
+                                            memory['pgpgout'],
+                                            memory['pgfault'],
+                                            memory['pgmajfault']))
+        outputFile.write("{0};{1};{2};{3};{4}\n".format(
+                                            memory['inactive_anon'],
+                                            memory['active_anon'],
+                                            memory['inactive_file'],
+                                            memory['active_file'],
+                                            memory['unevictable']))
+
+
 
 if __name__ == "__main__":
     main()
