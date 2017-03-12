@@ -10,6 +10,7 @@ from docker.Container import Container
 from docker.ContainerCollection import ContainerCollection
 from stats.CpuAcct import CpuAcctStat, CpuAcctPerCore, ThrottledCpu
 from stats.MemStat import MemStat
+from stats.BlkioStat import BlkioStat
 
 pp = pprint.PrettyPrinter(indent=4, width=40, depth=None, stream=None)
 
@@ -24,6 +25,7 @@ def main():
     print 'Output files: ' + outputFileNameBase + "*.csv"
     cpuSamples = []
     memorySamples = []
+    blkioSamples = []
 
     runningContainers = ContainerCollection()
     runningContainers.getRunningContainers()
@@ -43,6 +45,8 @@ def main():
             cpuSamples.append(cpuSample)
             memorySample = collectMemorySample(sampleName, runningContainers)
             memorySamples.append(memorySample)
+            blkioSample = collectBlkioSample(sampleName, runningContainers)
+            blkioSamples.append(blkioSample)
             sampleNumber += 1
         except EOFError as e:
             break
@@ -63,6 +67,14 @@ def main():
         writeMemoryStatisticsHeader(outputFile)
         for memorySample in memorySamples:
             writeMemorySample(outputFile, memorySample)
+    outputFile.close()
+
+    outputFileName = uniqueFileName(outputFileNameBase + '-blkio.csv')
+    print('\nWriting block statistics to {0} ...'.format(outputFileName))
+    with open(outputFileName, 'w') as outputFile:
+        writeBlkioStatisticsHeader(outputFile)
+        for blkioSample in blkioSamples:
+            writeBlkioSample(outputFile, blkioSample)
     outputFile.close()
 
     exit()
@@ -154,6 +166,31 @@ def writeMemorySample(outputFile, sample):
                                                 memory['unevictable']))
 
 
+def collectBlkioSample(sampleName, runningContainers):
+    sample = {}
+    sample['name'] = sampleName
+    sample['timestamp'] = time()
+    sample['containers'] = {}
+    for container in runningContainers.containers():
+        sample['containers'][container] = BlkioStat(container.id, container.name)
+    return sample
+
+def writeBlkioStatisticsHeader(outputFile):
+     outputFile.write("Sample;Timestamp;Container;Device;Operation;Count;Bytes\n")
+
+def writeBlkioSample(outputFile, sample):
+    for (container, blkioSample) in sample['containers'].iteritems():
+        blkioDevices = blkioSample.devices
+        for device in blkioDevices:
+            for operation in ('Read', 'Write', 'Async', 'Sync'):
+                ops = None
+                bytes = None
+                if operation in blkioDevices[device]['operations']:
+                    ops = blkioDevices[device]['operations'][operation]
+                if operation in blkioDevices[device]['bytes']:
+                    bytes = blkioDevices[device]['bytes'][operation]
+                outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
+                outputFile.write("{0};{1};{2};{3}\n".format(device, operation, ops, bytes))
 
 if __name__ == "__main__":
     main()
