@@ -1,4 +1,5 @@
 import datetime
+from errno import ENOENT, EACCES, EPERM
 
 class CpuAcctStat:
    'Class for cpu metric for a docker container'
@@ -8,13 +9,18 @@ class CpuAcctStat:
        self.containerId = containerId
        self.containerName = containerName
        self.time = datetime.datetime.now()
-       with open(CpuAcctStat.cpuacctPath + self.containerId + "/cpuacct.stat", "r") as cpuacct:
-           for line in cpuacct:
-               fields = line.split()
-               if (fields[0].find('user')):
-                   self.userJiffies = fields[1]
-               if (fields[0].find('system')):
-                   self.systemJiffies = fields[1]
+       try:
+           with open(CpuAcctStat.cpuacctPath + self.containerId + "/cpuacct.stat", "r") as cpuacct:
+               for line in cpuacct:
+                   fields = line.split()
+                   if (fields[0].find('user')):
+                       self.userJiffies = fields[1]
+                   if (fields[0].find('system')):
+                       self.systemJiffies = fields[1]
+       except IOError as err:
+           if err.errno == ENOENT:
+               print("No cpuacct.stat found for {0}".format(self.containerName))
+               pass
 
    def __str__(self):
         return "{0} @{1}. User={2} System={3} (in jiffies)".format(self.containerName, self.time, self.userJiffies, self.systemJiffies)
@@ -31,11 +37,16 @@ class CpuAcctPerCore:
        self.containerName = containerName
        self.time = datetime.datetime.now()
        self.perCore = []
-       with open(CpuAcctPerCore.cpuacctPath + self.containerId + "/cpuacct.usage_percpu", "r") as cpuacct:
-           for line in cpuacct:
-               fields = line.split()
-               for core in fields:
-                   self.perCore.append(core)
+       try:
+           with open(CpuAcctPerCore.cpuacctPath + self.containerId + "/cpuacct.usage_percpu", "r") as cpuacct:
+               for line in cpuacct:
+                   fields = line.split()
+                   for core in fields:
+                       self.perCore.append(core)
+       except IOError as err:
+           if err.errno == ENOENT:
+               print("No cpuacct.usage_percpu found for {0}".format(self.containerName))
+               pass
 
    def cpuPerCores(self):
        cpu = ''
@@ -61,15 +72,20 @@ class ThrottledCpu:
        self.containerName = containerName
        self.time = datetime.datetime.now()
        self.perCore = []
-       with open(CpuAcctPerCore.cpuacctPath + self.containerId + "/cpu.stat", "r") as cpuacct:
-           for line in cpuacct:
-              fields = line.split()
-              if (fields[0].find('nr_periods')):
-                  self.enforcementIntervals = fields[1]
-              if (fields[0].find('nr_throttled')):
-                  self.groupThrottilingCount = fields[1]
-              if (fields[0].find('throttled_time')):
-                  self.throttledTimeTotal = fields[1]
+       try:
+           with open(CpuAcctPerCore.cpuacctPath + self.containerId + "/cpu.stat", "r") as cpuacct:
+               for line in cpuacct:
+                  fields = line.split()
+                  if (fields[0].find('nr_periods')):
+                      self.enforcementIntervals = fields[1]
+                  if (fields[0].find('nr_throttled')):
+                      self.groupThrottilingCount = fields[1]
+                  if (fields[0].find('throttled_time')):
+                      self.throttledTimeTotal = fields[1]
+       except IOError as err:
+           if err.errno == ENOENT:
+               print("No cpu.stat found for {0}".format(self.containerName))
+               pass
 
    def __str__(self):
         return "{0} @{1}. EnforcementIntervals={2} GroupThrottilingCount={3} ThrottledTimeTotal={4}"\

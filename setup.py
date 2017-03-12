@@ -11,7 +11,7 @@ config = {
     'author_email': 'jyrkiokaski@gmail.com',
     'version': '0.1',
     'install_requires': ['nose'],
-    'packages': ['dockerstat'],
+    'packages': ['dockerstat','dockerstat/docker','dockerstat/stats'],
     'scripts': [],
     'name': 'dockerstat'
 }

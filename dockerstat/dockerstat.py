@@ -101,14 +101,19 @@ def writeCpuStatisticsHeader(outputFile):
 def writeCpuSample(outputFile, sample):
     for (container, sampleSet) in sample['containers'].iteritems():
         cpuacct = sampleSet['cpuacct']
+        userJiffies = getattr(cpuacct, 'userJiffies', None)
+        systemJiffies = getattr(cpuacct, 'systemJiffies', None)
         outputFile.write("{0};{1};{2};{3};{4};".format(sample['name'], sample['timestamp'],
                          container,
-                         cpuacct.userJiffies,
-                         cpuacct.systemJiffies))
+                         userJiffies,
+                         systemJiffies))
         throttled = sampleSet['throttled']
-        outputFile.write("{0};{1};{2};".format(throttled.enforcementIntervals,
-                                                throttled.groupThrottilingCount,
-                                                throttled.throttledTimeTotal))
+        enforcementIntervals = getattr(throttled, 'enforcementIntervals', None)
+        groupThrottilingCount = getattr(throttled, 'groupThrottilingCount', None)
+        throttledTimeTotal = getattr(throttled, 'throttledTimeTotal', None)
+        outputFile.write("{0};{1};{2};".format(enforcementIntervals,
+                                               groupThrottilingCount,
+                                               throttledTimeTotal))
         outputFile.write("{0}\n".format(sampleSet['percpu'].cpuPerCores()))
 
 def collectMemorySample(sampleName, runningContainers):
@@ -128,24 +133,25 @@ def writeMemoryStatisticsHeader(outputFile):
 def writeMemorySample(outputFile, sample):
     for (container, memStat) in sample['containers'].iteritems():
         memory = memStat.values
-        outputFile.write("{0};{1};{2}".format(sample['name'], sample['timestamp'], container.name))
-        outputFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};".format(
-                                            memory['cache'],
-                                            memory['rss'],
-                                            memory['rss_huge'],
-                                            memory['mapped_file'],
-                                            memory['dirty'],
-                                            memory['writeback'],
-                                            memory['pgpgin'],
-                                            memory['pgpgout'],
-                                            memory['pgfault'],
-                                            memory['pgmajfault']))
-        outputFile.write("{0};{1};{2};{3};{4}\n".format(
-                                            memory['inactive_anon'],
-                                            memory['active_anon'],
-                                            memory['inactive_file'],
-                                            memory['active_file'],
-                                            memory['unevictable']))
+        if len(memory) > 0:
+            outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
+            outputFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};".format(
+                                                memory['cache'],
+                                                memory['rss'],
+                                                memory['rss_huge'],
+                                                memory['mapped_file'],
+                                                memory['dirty'],
+                                                memory['writeback'],
+                                                memory['pgpgin'],
+                                                memory['pgpgout'],
+                                                memory['pgfault'],
+                                                memory['pgmajfault']))
+            outputFile.write("{0};{1};{2};{3};{4}\n".format(
+                                                memory['inactive_anon'],
+                                                memory['active_anon'],
+                                                memory['inactive_file'],
+                                                memory['active_file'],
+                                                memory['unevictable']))
 
 
 

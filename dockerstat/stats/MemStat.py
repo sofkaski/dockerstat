@@ -1,4 +1,5 @@
 import datetime
+from errno import ENOENT, EACCES, EPERM
 
 class MemStat:
    'Class for memorystatistics for a docker container'
@@ -9,10 +10,15 @@ class MemStat:
        self.containerName = containerName
        self.time = datetime.datetime.now()
        self.values = {}
-       with open(MemStat.memoryPath + self.containerId + "/memory.stat", "r") as memstat:
-           for line in memstat:
-               (param, value) = line.split()
-               self.values[param] = value
+       try:
+           with open(MemStat.memoryPath + self.containerId + "/memory.stat", "r") as memstat:
+               for line in memstat:
+                   (param, value) = line.split()
+                   self.values[param] = value
+       except IOError as err:
+           if err.errno == ENOENT:
+               print("No memory.stat found for {0}".format(self.containerName))
+               pass
 
    def __str__(self):
        result =  "{0} @{1}.\n".format(self.containerName, self.time)
