@@ -22,6 +22,7 @@ def main():
     parser.add_argument('arg', nargs='*') # use '+' for 1 or more args (instead of 0 or more)
     parsed = parser.parse_args()
     #print('Result:',  vars(parsed))
+    global outputFileNameBase
     outputFileNameBase =  parsed.output
     print 'Output files: ' + outputFileNameBase + "*.csv"
     cpuSamples = []
@@ -57,31 +58,21 @@ def main():
         finally:
             pass
 
-    outputFileName = uniqueFileName(outputFileNameBase + '-cpu.csv')
-    print('\nWriting cpu statistics to {0} ...'.format(outputFileName))
-    with open(outputFileName, 'w') as outputFile:
-        writeCpuStatisticsHeader(outputFile)
-        for cpuSample in cpuSamples:
-            writeCpuSample(outputFile, cpuSample)
-    outputFile.close()
-
-    outputFileName = uniqueFileName(outputFileNameBase + '-mem.csv')
-    print('\nWriting memory statistics to {0} ...'.format(outputFileName))
-    with open(outputFileName, 'w') as outputFile:
-        writeMemoryStatisticsHeader(outputFile)
-        for memorySample in memorySamples:
-            writeMemorySample(outputFile, memorySample)
-    outputFile.close()
-
-    outputFileName = uniqueFileName(outputFileNameBase + '-blkio.csv')
-    print('\nWriting block statistics to {0} ...'.format(outputFileName))
-    with open(outputFileName, 'w') as outputFile:
-        writeBlkioStatisticsHeader(outputFile)
-        for blkioSample in blkioSamples:
-            writeBlkioSample(outputFile, blkioSample)
-    outputFile.close()
+    writeStatistics('cpu', cpuSamples, writeCpuStatisticsHeader, writeCpuSample)
+    writeStatistics('mem', memorySamples, writeMemoryStatisticsHeader, writeMemorySample)
+    writeStatistics('blkio', blkioSamples, writeBlkioStatisticsHeader, writeBlkioSample)
+    writeStatistics('netio', netioSamples, writeNetioStatisticsHeader, writeNetioSample)
 
     exit()
+
+def writeStatistics(statisticsType, samples, headerFunction, sampleWriteFunction):
+    outputFileName = uniqueFileName(outputFileNameBase + '-' + statisticsType + '.csv')
+    print('\nWriting {0} statistics to {1} ...'.format(statisticsType, outputFileName))
+    with open(outputFileName, 'w') as outputFile:
+        headerFunction(outputFile)
+        for sample in samples:
+            sampleWriteFunction(outputFile, sample)
+    outputFile.close()
 
 def uniqueFileName(file):
     '''Append counter to the end of filename body, if the file already exists'''
@@ -204,6 +195,23 @@ def collectNetioSample(sampleName, runningContainers):
     for container in runningContainers.containers():
         sample['containers'][container] = NetIoStat(container.id, container.name)
     return sample
+
+def writeNetioStatisticsHeader(outputFile):
+     outputFile.write("Sample;Timestamp;Container;Interface;Received bytes;Received packets;Sent bytes;Sent packets\n")
+
+def writeNetioSample(outputFile, sample):
+    for (container, netioSample) in sample['containers'].iteritems():
+        interfaces = netioSample.interfaces
+        for interface in interfaces.keys():
+            outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
+            received = interfaces[interface]['received']
+            transmitted = interfaces[interface]['transmitted']
+            outputFile.write("{0};{1};{2};{3};{4}\n".format(interface,
+                                                            received['bytes'],
+                                                            received['packets'],
+                                                            transmitted['bytes'],
+                                                            transmitted['packets']))
+
 
 if __name__ == "__main__":
     main()
