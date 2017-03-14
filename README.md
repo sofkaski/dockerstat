@@ -24,7 +24,7 @@ Example file set from a run :
  * ds-2017-03-14-netio.csv
 
 Script will add postfixes to names to produce unique file names,
-if subsequent runs are made using the same basic name for output files. 
+if subsequent runs are made using the same basic name for output files.
 
 There is a header line and row for each sample, including timestamp.
 
