@@ -11,6 +11,7 @@ from docker.ContainerCollection import ContainerCollection
 from stats.CpuAcct import CpuAcctStat, CpuAcctPerCore, ThrottledCpu
 from stats.MemStat import MemStat
 from stats.BlkioStat import BlkioStat
+from stats.NetIoStat import NetIoStat
 
 pp = pprint.PrettyPrinter(indent=4, width=40, depth=None, stream=None)
 
@@ -26,6 +27,7 @@ def main():
     cpuSamples = []
     memorySamples = []
     blkioSamples = []
+    netioSamples = []
 
     runningContainers = ContainerCollection()
     runningContainers.getRunningContainers()
@@ -47,6 +49,8 @@ def main():
             memorySamples.append(memorySample)
             blkioSample = collectBlkioSample(sampleName, runningContainers)
             blkioSamples.append(blkioSample)
+            netioSample = collectNetioSample(sampleName, runningContainers)
+            netioSamples.append(netioSample)
             sampleNumber += 1
         except EOFError as e:
             break
@@ -191,6 +195,15 @@ def writeBlkioSample(outputFile, sample):
                     bytes = blkioDevices[device]['bytes'][operation]
                 outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
                 outputFile.write("{0};{1};{2};{3}\n".format(device, operation, ops, bytes))
+
+def collectNetioSample(sampleName, runningContainers):
+    sample = {}
+    sample['name'] = sampleName
+    sample['timestamp'] = time()
+    sample['containers'] = {}
+    for container in runningContainers.containers():
+        sample['containers'][container] = NetIoStat(container.id, container.name)
+    return sample
 
 if __name__ == "__main__":
     main()
