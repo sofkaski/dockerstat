@@ -6,10 +6,10 @@ except ImportError:
 config = {
     'description': 'dockerstat',
     'author': 'Jyrki K',
-    'url': 'URL to get it at.',
-    'download_url': 'Where to download it.',
+    'url': 'https://github.com/sofkaski/dockerstat',
+    'download_url': 'https://github.com/sofkaski/dockerstat',
     'author_email': 'jyrkiokaski@gmail.com',
-    'version': '0.1',
+    'version': '1.0',
     'install_requires': ['nose'],
     'packages': ['dockerstat','dockerstat/docker','dockerstat/stats'],
     'scripts': [],
