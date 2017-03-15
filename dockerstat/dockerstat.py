@@ -69,8 +69,11 @@ def writeStatistics(statisticsType, samples, headerFunction, sampleWriteFunction
     outputFileName = uniqueFileName(outputFileNameBase + '-' + statisticsType + '.csv')
     print('\nWriting {0} statistics to {1} ...'.format(statisticsType, outputFileName))
     with open(outputFileName, 'w') as outputFile:
-        headerFunction(outputFile)
+        headerNotWritten = True
         for sample in samples:
+            if headerNotWritten:
+                headerFunction(outputFile, sample)
+                headerNotWritten = False
             sampleWriteFunction(outputFile, sample)
     outputFile.close()
 
@@ -100,7 +103,7 @@ def collectCpuSample(sampleName, runningContainers):
     # pp.pprint(sample)
     return sample
 
-def writeCpuStatisticsHeader(outputFile):
+def writeCpuStatisticsHeader(outputFile,sample):
      outputFile.write("Sample;Timestamp;Container;User Jiffies;System Jiffies;")
      outputFile.write("Enforcement Intervals;Group Throttiling Count;Throttled Time Total;")
      outputFile.write("Cores\n")
@@ -132,34 +135,22 @@ def collectMemorySample(sampleName, runningContainers):
         sample['containers'][container] = MemStat(container.id, container.name)
     return sample
 
-def writeMemoryStatisticsHeader(outputFile):
-     outputFile.write("Sample;Timestamp;Container;cache;rss;rss_huge;")
-     outputFile.write("mapped_file;dirty;writeback;pgpgin;pgpgout;pgfault;pgmajfault;")
-     outputFile.write("inactive_anon;active_anon;inactive_file;active_file;unevictable\n")
+def writeMemoryStatisticsHeader(outputFile, sample):
+    outputFile.write("Sample;Timestamp;Container")
+     # Take rest of the headers from sample. Content of memory statistics seem to vary in different versions
+     # Pick first container and  first sample
+    firstContainer = sample['containers'].keys()[0]
+    memSample = sample['containers'][firstContainer]
+    for key in sorted(memSample.values.keys()):
+        outputFile.write(";{0}".format(key))
+    outputFile.write("\n")
 
 def writeMemorySample(outputFile, sample):
     for (container, memStat) in sample['containers'].iteritems():
-        memory = memStat.values
-        if len(memory) > 0:
-            outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
-            outputFile.write("{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};".format(
-                                                memory['cache'],
-                                                memory['rss'],
-                                                memory['rss_huge'],
-                                                memory['mapped_file'],
-                                                memory['dirty'],
-                                                memory['writeback'],
-                                                memory['pgpgin'],
-                                                memory['pgpgout'],
-                                                memory['pgfault'],
-                                                memory['pgmajfault']))
-            outputFile.write("{0};{1};{2};{3};{4}\n".format(
-                                                memory['inactive_anon'],
-                                                memory['active_anon'],
-                                                memory['inactive_file'],
-                                                memory['active_file'],
-                                                memory['unevictable']))
-
+        outputFile.write("{0};{1};{2}".format(sample['name'], sample['timestamp'], container.name))
+        for key in sorted(memStat.values.keys()):
+            outputFile.write(";{0}".format(memStat.values[key]))
+        outputFile.write("\n")
 
 def collectBlkioSample(sampleName, runningContainers):
     sample = {}
@@ -170,7 +161,7 @@ def collectBlkioSample(sampleName, runningContainers):
         sample['containers'][container] = BlkioStat(container.id, container.name)
     return sample
 
-def writeBlkioStatisticsHeader(outputFile):
+def writeBlkioStatisticsHeader(outputFile, sample):
      outputFile.write("Sample;Timestamp;Container;Device;Operation;Count;Bytes\n")
 
 def writeBlkioSample(outputFile, sample):
@@ -196,7 +187,7 @@ def collectNetioSample(sampleName, runningContainers):
         sample['containers'][container] = NetIoStat(container.id, container.name)
     return sample
 
-def writeNetioStatisticsHeader(outputFile):
+def writeNetioStatisticsHeader(outputFile, sample):
      outputFile.write("Sample;Timestamp;Container;Interface;Received bytes;Received packets;Sent bytes;Sent packets\n")
 
 def writeNetioSample(outputFile, sample):
