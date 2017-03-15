@@ -94,4 +94,7 @@ ENV/
 .ropeproject
 
 # csv files
-.csv
+*.csv
+
+# IDE files
+.idea/
