@@ -1,11 +1,11 @@
 # dockerstat
-Python scripts to aid collection of docker containers resource consumption statistics.
+Python scripts to aid collection of docker containers resource consumption statistics in Linux hosts.
 ## installation
 Clone the repo or unzip tar file to some directory
 ## Running
-'''
-python dockerstat.py [-o | --output &lt;output file name&gt;]
-'''
+```
+python dockerstat.py [-o | --output <output file name>]
+```
 --output option can be used to give a basic name for output files. The default name is ds-&lt;date&gt;.
 
 When running the script asks repeatedly for a sample name. You can use the name of the use case that you are testing.
