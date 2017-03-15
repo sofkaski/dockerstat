@@ -52,6 +52,7 @@ class BlkioStat:
         try:
             with open(sysDevPath.format(deviceNumber)) as sysdev:
                 for line in sysdev:
+                    line = line.rstrip()
                     if 'DEVNAME' in line:
                         (label, deviceName) = line.split('=')
                     if 'DEVTYPE' in line:

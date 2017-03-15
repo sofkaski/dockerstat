@@ -176,7 +176,11 @@ def writeBlkioSample(outputFile, sample):
                 if operation in blkioDevices[device]['bytes']:
                     bytes = blkioDevices[device]['bytes'][operation]
                 outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
-                outputFile.write("{0};{1};{2};{3}\n".format(device, operation, ops, bytes))
+                outputFile.write("{0}({1});{2};{3};{4}\n".format(blkioDevices[device]['name'],
+                                                                 blkioDevices[device]['type'],
+                                                                 operation,
+                                                                 ops,
+                                                                 bytes))
 
 def collectNetioSample(sampleName, runningContainers):
     sample = {}
