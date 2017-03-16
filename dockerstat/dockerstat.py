@@ -162,25 +162,19 @@ def collectBlkioSample(sampleName, runningContainers):
     return sample
 
 def writeBlkioStatisticsHeader(outputFile, sample):
-     outputFile.write("Sample;Timestamp;Container;Device;Operation;Count;Bytes\n")
+     outputFile.write("Sample;Timestamp;Container;Device;Read count;Write count;Async count;Sync count;Read bytes;Write bytes;Async bytes;Sync bytes;\n")
 
 def writeBlkioSample(outputFile, sample):
     for (container, blkioSample) in sample['containers'].iteritems():
         blkioDevices = blkioSample.devices
         for device in blkioDevices:
+            outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
+            outputFile.write("{0}({1})".format(blkioDevices[device]['name'], blkioDevices[device]['type']))
             for operation in ('Read', 'Write', 'Async', 'Sync'):
-                ops = None
-                bytes = None
-                if operation in blkioDevices[device]['operations']:
-                    ops = blkioDevices[device]['operations'][operation]
-                if operation in blkioDevices[device]['bytes']:
-                    bytes = blkioDevices[device]['bytes'][operation]
-                outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
-                outputFile.write("{0}({1});{2};{3};{4}\n".format(blkioDevices[device]['name'],
-                                                                 blkioDevices[device]['type'],
-                                                                 operation,
-                                                                 ops,
-                                                                 bytes))
+                outputFile.write(";{0}".format(blkioDevices[device]['operations'][operation]))
+            for operation in ('Read', 'Write', 'Async', 'Sync'):
+                outputFile.write(";{0}".format(blkioDevices[device]['bytes'][operation]))
+            outputFile.write("\n")
 
 def collectNetioSample(sampleName, runningContainers):
     sample = {}
