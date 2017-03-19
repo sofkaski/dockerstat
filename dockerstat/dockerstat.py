@@ -198,9 +198,15 @@ def writeMemoryStatisticsHeader(outputFile, sample):
 
 def writeMemorySample(outputFile, sample, prevSample):
     for (container, memStat) in sample['containers'].iteritems():
+        prevMemStat = None
+        if prevSample:
+            prevMemStat = prevSample['containers'][container]
         outputFile.write("{0};{1};{2}".format(sample['name'], sample['timestamp'], container.name))
         for key in sorted(memStat.values.keys()):
-            outputFile.write(";{0}".format(memStat.values[key]))
+            value = number(memStat.values[key])
+            if prevMemStat:
+                value -= number(prevMemStat.values[key])
+            outputFile.write(";{0}".format(value))
         outputFile.write("\n")
 
 def collectBlkioSample(sampleName, runningContainers):
@@ -266,7 +272,7 @@ def writeNetioSample(outputFile, sample, prevSample):
                 transmittedBytes -= number(prevInterfaces[interface]['transmitted']['bytes'])
                 receivedPackets -= number(prevInterfaces[interface]['received']['packets'])
                 transmittedPackets = number(prevInterfaces[interface]['transmitted']['packets'])
-                
+
             outputFile.write("{0};{1};{2};{3};{4}\n".format(interface,
                                                             receivedBytes,
                                                             receivedPackets,
