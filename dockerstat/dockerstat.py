@@ -252,15 +252,26 @@ def writeNetioStatisticsHeader(outputFile, sample):
 def writeNetioSample(outputFile, sample, prevSample):
     for (container, netioSample) in sample['containers'].iteritems():
         interfaces = netioSample.interfaces
+        prevInterfaces = None
+        if prevSample:
+            prevInterfaces = prevSample['containers'][container].interfaces
         for interface in interfaces.keys():
             outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
-            received = interfaces[interface]['received']
-            transmitted = interfaces[interface]['transmitted']
+            receivedBytes = number(interfaces[interface]['received']['bytes'])
+            transmittedBytes = number(interfaces[interface]['transmitted']['bytes'])
+            receivedPackets = number(interfaces[interface]['received']['packets'])
+            transmittedPackets = number(interfaces[interface]['transmitted']['packets'])
+            if prevInterfaces:
+                receivedBytes -= number(prevInterfaces[interface]['received']['bytes'])
+                transmittedBytes -= number(prevInterfaces[interface]['transmitted']['bytes'])
+                receivedPackets -= number(prevInterfaces[interface]['received']['packets'])
+                transmittedPackets = number(prevInterfaces[interface]['transmitted']['packets'])
+                
             outputFile.write("{0};{1};{2};{3};{4}\n".format(interface,
-                                                            received['bytes'],
-                                                            received['packets'],
-                                                            transmitted['bytes'],
-                                                            transmitted['packets']))
+                                                            receivedBytes,
+                                                            receivedPackets,
+                                                            transmittedBytes,
+                                                            transmittedPackets))
 
 def number(s):
     try:
