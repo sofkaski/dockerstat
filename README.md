@@ -4,17 +4,21 @@ Python scripts to aid collection of docker containers resource consumption stati
 Clone the repo or unzip tar file to some directory
 ## Running
 ```
-python dockerstat.py [-o | --output <output file name>]
+python dockerstat.py [-d | --delta] [-o | --output <output file name>]
 ```
---output option can be used to give a basic name for output files. The default name is ds-&lt;date&gt;.
+Options:
+ * delta: resource usage delta between samples is calculated and output instead of absolute values.
+ * output: can be used to give a basic name for output files. The default name is ds-&lt;date&gt;.
 
 When running the script asks repeatedly for a sample name. You can use the name of the use case that you are testing.
 Sample name can be left empty and then default sample name is used.
 Default is Sample_0, Sample_1, ...
 
-When sample name, or empty, is given the script takes a sample of docker resources from all running docker containers.
+When sample name, or empty, is given the script takes a sample of docker resources from all running docker containers in the host.
 This can be repeated as many times as wanted.
-Once through with testing hit ctrl-d and then the script will output four files to working directory: cpu, memory, block io and net io statistics.  
+Once through with testing hit ctrl-d and then the script will output four files to working directory: cpu, memory, block io and net io statistics.
+By default output values are absolute. When using option --delta resource consumption values between consecutive samples are output.
+Sample_1 contains values Sample_1 - Sample_2, Sample_2 contains values Sample_3 - Sample_2 and so on.   
 ## Produced data files
 Files are csv formatted and can be opened e.g. with excel.
 Example file set from a run :
