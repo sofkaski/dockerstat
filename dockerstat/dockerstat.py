@@ -19,11 +19,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--output',  help='Name for the output files', required=False,
                         default='ds-' + datetime.now().strftime('%Y-%m-%d'))
+    parser.add_argument('-d', '--delta',  help='Calculate and output deltas between samples', required=False,
+                        action='store_true')
     parser.add_argument('arg', nargs='*') # use '+' for 1 or more args (instead of 0 or more)
     parsed = parser.parse_args()
     #print('Result:',  vars(parsed))
     global outputFileNameBase
     outputFileNameBase =  parsed.output
+    calculateDeltas = parsed.delta
     print 'Output files: ' + outputFileNameBase + "*.csv"
     cpuSamples = []
     memorySamples = []
@@ -58,24 +61,39 @@ def main():
         finally:
             pass
 
-    writeStatistics('cpu', cpuSamples, writeCpuStatisticsHeader, writeCpuSample)
-    writeStatistics('mem', memorySamples, writeMemoryStatisticsHeader, writeMemorySample)
-    writeStatistics('blkio', blkioSamples, writeBlkioStatisticsHeader, writeBlkioSample)
-    writeStatistics('netio', netioSamples, writeNetioStatisticsHeader, writeNetioSample)
+    if calculateDeltas:
+        if len(cpuSamples) < 2:
+            print('\nAt least two samples are needed when deltas are calculated.')
+            return
+
+    writeStatistics('cpu', cpuSamples, writeCpuStatisticsHeader, writeCpuSample, calculateDeltas)
+    writeStatistics('mem', memorySamples, writeMemoryStatisticsHeader, writeMemorySample, calculateDeltas)
+    writeStatistics('blkio', blkioSamples, writeBlkioStatisticsHeader, writeBlkioSample, calculateDeltas)
+    writeStatistics('netio', netioSamples, writeNetioStatisticsHeader, writeNetioSample, calculateDeltas)
 
     exit()
 
-def writeStatistics(statisticsType, samples, headerFunction, sampleWriteFunction):
+def writeStatistics(statisticsType, samples, headerFunction, sampleWriteFunction, calculateDeltas):
     outputFileName = uniqueFileName(outputFileNameBase + '-' + statisticsType + '.csv')
-    print('\nWriting {0} statistics to {1} ...'.format(statisticsType, outputFileName))
+    if calculateDeltas:
+        print('\nWriting sample deltas of {0} statistics to {1} ...'.format(statisticsType, outputFileName))
+    else:
+        print('\nWriting {0} statistics to {1} ...'.format(statisticsType, outputFileName))
     with open(outputFileName, 'w') as outputFile:
         headerNotWritten = True
+        prevSample = None
         for sample in samples:
             if headerNotWritten:
                 headerFunction(outputFile, sample)
                 headerNotWritten = False
-            sampleWriteFunction(outputFile, sample)
-    outputFile.close()
+            if calculateDeltas:
+                if prevSample == None:
+                    prevSample = sample
+                    continue
+                sampleWriteFunction(outputFile, sample, prevSample)
+                prevSample = sample
+            else:
+                sampleWriteFunction(outputFile, sample, None)
 
 def uniqueFileName(file):
     '''Append counter to the end of filename body, if the file already exists'''
@@ -97,7 +115,7 @@ def collectCpuSample(sampleName, runningContainers):
     for container in runningContainers.containers():
         sampleSet = {}
         sampleSet['cpuacct'] = CpuAcctStat(container.id, container.name)
-        sampleSet['percpu'] = CpuAcctPerCore(container.id, container.name)
+        sampleSet['percore'] = CpuAcctPerCore(container.id, container.name)
         sampleSet['throttled'] = ThrottledCpu(container.id, container.name)
         sample['containers'][container.name] = sampleSet
     # pp.pprint(sample)
@@ -106,25 +124,58 @@ def collectCpuSample(sampleName, runningContainers):
 def writeCpuStatisticsHeader(outputFile,sample):
      outputFile.write("Sample;Timestamp;Container;User Jiffies;System Jiffies;")
      outputFile.write("Enforcement Intervals;Group Throttiling Count;Throttled Time Total;")
-     outputFile.write("Cores\n")
+      # Pick first container and  first sample and nbr of cores from there
+     firstContainer = sample['containers'].keys()[0]
+     perCoreSample = sample['containers'][firstContainer]['percore']
+     for i in range(0,len(perCoreSample.perCore)):
+        outputFile.write("Core {0};".format(i))
+     outputFile.write("\n")
 
-def writeCpuSample(outputFile, sample):
+def writeCpuSample(outputFile, sample, prevSample):
     for (container, sampleSet) in sample['containers'].iteritems():
         cpuacct = sampleSet['cpuacct']
-        userJiffies = getattr(cpuacct, 'userJiffies', None)
-        systemJiffies = getattr(cpuacct, 'systemJiffies', None)
+        userJiffies = number(getattr(cpuacct, 'userJiffies', None))
+        systemJiffies = number(getattr(cpuacct, 'systemJiffies', None))
+        if prevSample:
+            prevCpuacct = prevSample['containers'][container]['cpuacct']
+            prevUserJiffies = number(getattr(prevCpuacct, 'userJiffies', None))
+            prevSystemJiffies = number(getattr(prevCpuacct, 'systemJiffies', None))
+            if prevUserJiffies:
+                userJiffies -= prevUserJiffies
+            if prevSystemJiffies:
+                systemJiffies -= prevSystemJiffies
         outputFile.write("{0};{1};{2};{3};{4};".format(sample['name'], sample['timestamp'],
                          container,
                          userJiffies,
                          systemJiffies))
         throttled = sampleSet['throttled']
-        enforcementIntervals = getattr(throttled, 'enforcementIntervals', None)
-        groupThrottilingCount = getattr(throttled, 'groupThrottilingCount', None)
-        throttledTimeTotal = getattr(throttled, 'throttledTimeTotal', None)
-        outputFile.write("{0};{1};{2};".format(enforcementIntervals,
+        enforcementIntervals = number(getattr(throttled, 'enforcementIntervals', None))
+        groupThrottilingCount = number(getattr(throttled, 'groupThrottilingCount', None))
+        throttledTimeTotal = number(getattr(throttled, 'throttledTimeTotal', None))
+        if prevSample:
+            prevThrottled = prevSample['containers'][container]['throttled']
+            prevEnforcementIntervals = number(getattr(prevThrottled, 'enforcementIntervals', None))
+            prevGroupThrottilingCount = number(getattr(prevThrottled, 'groupThrottilingCount', None))
+            prevThrottledTimeTotal = number(getattr(prevThrottled, 'throttledTimeTotal', None))
+            if prevEnforcementIntervals:
+                enforcementIntervals -= prevEnforcementIntervals
+            if prevGroupThrottilingCount:
+                groupThrottilingCount -= prevGroupThrottilingCount
+            if prevThrottledTimeTotal:
+                throttledTimeTotal -= prevThrottledTimeTotal
+        outputFile.write("{0};{1};{2}".format(enforcementIntervals,
                                                groupThrottilingCount,
                                                throttledTimeTotal))
-        outputFile.write("{0}\n".format(sampleSet['percpu'].cpuPerCores()))
+        perCoreSample = sampleSet['percore']
+        prevPerCoreSample = None
+        if prevSample:
+            prevPerCoreSample = prevSample['containers'][container]['percore']
+        for i, coreNs in enumerate(perCoreSample.perCore):
+            ns = number(coreNs)
+            if prevPerCoreSample:
+                ns -= number(prevPerCoreSample.perCore[i])
+            outputFile.write(";{0}".format(ns))
+        outputFile.write("\n")
 
 def collectMemorySample(sampleName, runningContainers):
     sample = {}
@@ -145,7 +196,7 @@ def writeMemoryStatisticsHeader(outputFile, sample):
         outputFile.write(";{0}".format(key))
     outputFile.write("\n")
 
-def writeMemorySample(outputFile, sample):
+def writeMemorySample(outputFile, sample, prevSample):
     for (container, memStat) in sample['containers'].iteritems():
         outputFile.write("{0};{1};{2}".format(sample['name'], sample['timestamp'], container.name))
         for key in sorted(memStat.values.keys()):
@@ -164,7 +215,7 @@ def collectBlkioSample(sampleName, runningContainers):
 def writeBlkioStatisticsHeader(outputFile, sample):
      outputFile.write("Sample;Timestamp;Container;Device;Read count;Write count;Async count;Sync count;Read bytes;Write bytes;Async bytes;Sync bytes;\n")
 
-def writeBlkioSample(outputFile, sample):
+def writeBlkioSample(outputFile, sample, prevSample):
     for (container, blkioSample) in sample['containers'].iteritems():
         blkioDevices = blkioSample.devices
         for device in blkioDevices:
@@ -188,7 +239,7 @@ def collectNetioSample(sampleName, runningContainers):
 def writeNetioStatisticsHeader(outputFile, sample):
      outputFile.write("Sample;Timestamp;Container;Interface;Received bytes;Received packets;Sent bytes;Sent packets\n")
 
-def writeNetioSample(outputFile, sample):
+def writeNetioSample(outputFile, sample, prevSample):
     for (container, netioSample) in sample['containers'].iteritems():
         interfaces = netioSample.interfaces
         for interface in interfaces.keys():
@@ -201,6 +252,13 @@ def writeNetioSample(outputFile, sample):
                                                             transmitted['bytes'],
                                                             transmitted['packets']))
 
+def number(s):
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
+    except TypeError:
+        return None
 
 if __name__ == "__main__":
     main()
