@@ -218,13 +218,23 @@ def writeBlkioStatisticsHeader(outputFile, sample):
 def writeBlkioSample(outputFile, sample, prevSample):
     for (container, blkioSample) in sample['containers'].iteritems():
         blkioDevices = blkioSample.devices
+        prevBlkioDevices = None
+        if prevSample:
+            prevBlkioDevices = prevSample['containers'][container].devices
+
         for device in blkioDevices:
             outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
             outputFile.write("{0}({1})".format(blkioDevices[device]['name'], blkioDevices[device]['type']))
             for operation in ('Read', 'Write', 'Async', 'Sync'):
-                outputFile.write(";{0}".format(blkioDevices[device]['operations'][operation]))
+                value = number(blkioDevices[device]['operations'][operation])
+                if prevBlkioDevices:
+                    value -= number(prevBlkioDevices[device]['operations'][operation])
+                outputFile.write(";{0}".format(value))
             for operation in ('Read', 'Write', 'Async', 'Sync'):
-                outputFile.write(";{0}".format(blkioDevices[device]['bytes'][operation]))
+                value = number(blkioDevices[device]['bytes'][operation])
+                if prevBlkioDevices:
+                    value -= number(prevBlkioDevices[device]['bytes'][operation])
+                outputFile.write(";{0}".format(value))
             outputFile.write("\n")
 
 def collectNetioSample(sampleName, runningContainers):
