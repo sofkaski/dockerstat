@@ -88,6 +88,7 @@ def writeStatistics(statisticsType, samples, headerFunction, sampleWriteFunction
                 headerNotWritten = False
             if calculateDeltas:
                 if prevSample == None:
+                    sampleWriteFunction(outputFile, sample, None)
                     prevSample = sample
                     continue
                 sampleWriteFunction(outputFile, sample, prevSample)
@@ -136,7 +137,9 @@ def writeCpuSample(outputFile, sample, prevSample):
         cpuacct = sampleSet['cpuacct']
         userJiffies = number(getattr(cpuacct, 'userJiffies', None))
         systemJiffies = number(getattr(cpuacct, 'systemJiffies', None))
+        timeStamp = sample['timestamp']
         if prevSample:
+            timeStamp -= prevSample['timestamp']
             prevCpuacct = prevSample['containers'][container]['cpuacct']
             prevUserJiffies = number(getattr(prevCpuacct, 'userJiffies', None))
             prevSystemJiffies = number(getattr(prevCpuacct, 'systemJiffies', None))
@@ -144,7 +147,7 @@ def writeCpuSample(outputFile, sample, prevSample):
                 userJiffies -= prevUserJiffies
             if prevSystemJiffies:
                 systemJiffies -= prevSystemJiffies
-        outputFile.write("{0};{1};{2};{3};{4};".format(sample['name'], sample['timestamp'],
+        outputFile.write("{0};{1};{2};{3};{4};".format(sample['name'], int(timeStamp),
                          container,
                          userJiffies,
                          systemJiffies))
@@ -199,9 +202,11 @@ def writeMemoryStatisticsHeader(outputFile, sample):
 def writeMemorySample(outputFile, sample, prevSample):
     for (container, memStat) in sample['containers'].iteritems():
         prevMemStat = None
+        timeStamp = sample['timestamp']
         if prevSample:
+            timeStamp -= prevSample['timestamp']
             prevMemStat = prevSample['containers'][container]
-        outputFile.write("{0};{1};{2}".format(sample['name'], sample['timestamp'], container.name))
+        outputFile.write("{0};{1};{2}".format(sample['name'], int(timeStamp), container.name))
         for key in sorted(memStat.values.keys()):
             value = number(memStat.values[key])
             if prevMemStat:
@@ -225,11 +230,13 @@ def writeBlkioSample(outputFile, sample, prevSample):
     for (container, blkioSample) in sample['containers'].iteritems():
         blkioDevices = blkioSample.devices
         prevBlkioDevices = None
+        timeStamp = sample['timestamp']
         if prevSample:
+            timeStamp -= prevSample['timestamp']
             prevBlkioDevices = prevSample['containers'][container].devices
 
         for device in blkioDevices:
-            outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
+            outputFile.write("{0};{1};{2};".format(sample['name'], int(timeStamp), container.name))
             outputFile.write("{0}({1})".format(blkioDevices[device]['name'], blkioDevices[device]['type']))
             for operation in ('Read', 'Write', 'Async', 'Sync'):
                 value = number(blkioDevices[device]['operations'][operation])
@@ -259,10 +266,12 @@ def writeNetioSample(outputFile, sample, prevSample):
     for (container, netioSample) in sample['containers'].iteritems():
         interfaces = netioSample.interfaces
         prevInterfaces = None
+        timeStamp = sample['timestamp']
         if prevSample:
+            timeStamp -= prevSample['timestamp']
             prevInterfaces = prevSample['containers'][container].interfaces
         for interface in interfaces.keys():
-            outputFile.write("{0};{1};{2};".format(sample['name'], sample['timestamp'], container.name))
+            outputFile.write("{0};{1};{2};".format(sample['name'], int(timeStamp), container.name))
             receivedBytes = number(interfaces[interface]['received']['bytes'])
             transmittedBytes = number(interfaces[interface]['transmitted']['bytes'])
             receivedPackets = number(interfaces[interface]['received']['packets'])
