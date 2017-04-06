@@ -9,7 +9,7 @@ config = {
     'url': 'https://github.com/sofkaski/dockerstat',
     'download_url': 'https://github.com/sofkaski/dockerstat',
     'author_email': 'jyrkiokaski@gmail.com',
-    'version': '1.1',
+    'version': '1.2',
     'install_requires': ['nose'],
     'packages': ['dockerstat','dockerstat/docker','dockerstat/stats'],
     'scripts': [],
